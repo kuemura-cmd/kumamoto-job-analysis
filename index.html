@@ -64,6 +64,11 @@
             const districtSelect = document.getElementById('district-select');
             const jobSelect = document.getElementById('job-select');
 
+            if (!districtSelect || !jobSelect) {
+                console.error("フィルタ選択要素が見つかりませんでした。");
+                return;
+            }
+
             // 選択肢の追加
             districtSelect.innerHTML = '<option value="すべて">すべて</option>';
             defaultDistricts.sort().forEach(district => {
