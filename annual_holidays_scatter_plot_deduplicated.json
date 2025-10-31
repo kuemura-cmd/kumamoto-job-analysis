@@ -26,6 +26,7 @@
     }
   ],
   "transform": [
+    // 年間休日数（ヘッダー名が「年間休日数」であることを前提）を数値に変換
     {"calculate": "toNumber(datum['年間休日数'])", "as": "年間休日数_数値"},
     {"filter": "(datum.区 === district_filter) || (district_filter === 'すべて')"},
     {"filter": "(datum.職種分類 === job_filter) || (job_filter === 'すべて')"},
