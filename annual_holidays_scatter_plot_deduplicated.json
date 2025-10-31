@@ -1,12 +1,9 @@
 {
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
   "title": "熊本市 各事業所の年間休日数散布図",
   "data": {
-    "name": "data_source"
-    // ★★★ここにデータ全体が含まれます。データ量が多いため省略★★★
-    // 実際にWebに公開する際は、このJSONを生成したときに出力されたデータが
-    // "values"として自動的に組み込まれていることを確認してください。
-    // もしJSONファイルにデータが含まれていない場合は、別途CSVとして公開した
-    // 集計データをURLで指定する必要があります（次のセクションを参照）。
+    "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5QjvstFqTzdOPORH62h7K_KCvwChYar9pJfWOfkWZ2HCoLrtLcZkzuahoosYpmafsEIBZM5az_7He/pub?gid=255864226&single=true&output=csv",
+    "format": {"type": "csv"}
   },
   "params": [
     {
@@ -22,48 +19,75 @@
       "name": "job_filter",
       "bind": {
         "input": "select",
-        "options": ["すべて", "正看護師", "准看護師", "その他看護職"],
+        "options": ["すべて", "准看護師", "正看護師", "その他看護職", "非看護職・未分類"],
         "name": "職種: "
       },
       "value": "すべて"
     }
   ],
   "transform": [
+    // 1. データ型を数値に変換（年間休日数が文字列の場合があるため）
+    {"calculate": "toNumber(datum.年間休日数)", "as": "年間休日数_数値"},
+    
+    // 2. フィルタリング (ユーザー選択と無効データ除外)
     {
       "filter": "(datum.区 === district_filter) || (district_filter === 'すべて')"
     },
     {
-      "filter": "(datum.分類 === job_filter) || (job_filter === 'すべて')"
+      "filter": "(datum.職種分類 === job_filter) || (job_filter === 'すべて')"
     },
+    {
+      "filter": "datum.年間休日数_数値 !== null" // 休日数がnullのデータをフィルタリング
+    },
+
+    // 3. 集計/重複排除: 事業所名、区、分類、業種分類ごとに中央値を算出
+    {
+      "aggregate": [
+        {"op": "median", "field": "年間休日数_数値", "as": "年間休日数（中央値）"}
+      ],
+      "groupby": ["事業所名", "区", "職種分類", "業種分類"]
+    },
+    
+    // 4. 全体中央値の計算 (フィルタリングされた集計データの中央値を計算)
+    {
+      "aggregate": [{"op": "median", "field": "年間休日数（中央値）", "as": "中央値_全体"}],
+      "as": ["中央値_全体"]
+    },
+
+    // 5. ランキングの計算 (X軸のプロット順位)
     {
       "window": [{"op": "rank", "as": "順位"}],
       "sort": [{"field": "年間休日数（中央値）", "order": "ascending"}]
-    },
-    {
-      "aggregate": [{"op": "median", "field": "年間休日数（中央値）", "as": "中央値"}],
-      "as": ["中央値_全体"]
     }
   ],
   "layer": [
+    // 中央値の横線
     {
+      "data": {"source": "data_source"},
+      "transform": [
+        {"aggregate": [{"op": "median", "field": "年間休日数（中央値）", "as": "中央値_全体"}]},
+        {"calculate": "'全体中央値'", "as": "tooltip_label"}
+      ],
       "mark": {"type": "rule", "color": "red", "strokeDash": [5, 5]},
       "encoding": {
         "y": {"field": "中央値_全体", "type": "quantitative"},
         "tooltip": [
-          {"field": "中央値_全体", "format": ".1f", "title": "中央値"}
+          {"field": "tooltip_label", "type": "nominal", "title": "中央値"},
+          {"field": "中央値_全体", "format": ".1f", "title": "休日数"}
         ]
       }
     },
+    // 散布図のプロット
     {
       "mark": {"type": "circle", "size": 60},
       "encoding": {
         "x": {"field": "順位", "title": "求人事業所 順位 (年間休日数中央値 昇順)"},
         "y": {"field": "年間休日数（中央値）", "title": "年間休日数（中央値） (日)"},
-        "color": {"field": "分類", "title": "職種分類", "sort": ["正看護師", "准看護師", "その他看護職"]},
+        "color": {"field": "職種分類", "title": "職種分類", "sort": ["正看護師", "准看護師", "その他看護職"]},
         "tooltip": [
           "事業所名",
           "区",
-          "分類",
+          "職種分類",
           "業種分類",
           {"field": "年間休日数（中央値）", "format": ".0f", "title": "休日数中央値"}
         ]
