@@ -30,101 +30,41 @@
     <div id="vis"></div>
 
     <script>
-        // グラフ定義をJavaScriptオブジェクトとしてインライン化
-        const vegaLiteSpecTemplate = {
-            "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
-            "title": "熊本市 各事業所の年間休日数散布図",
-            "data": {
-                "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5QjvstFqTzdOPORH62h7K_KCvwChYar9pJfWOfkWZ2HCoLrtLcZkzuahoosYpmafsEIBZM5az_7He/pub?gid=787523519&single=true&output=csv",
-                "format": {
-                    "type": "csv" 
-                }
-            },
-            "params": [
-                {
-                    "name": "district_filter",
-                    "bind": {
-                        "input": "select",
-                        "options": ["すべて", "中央区", "東区", "西区", "南区", "北区", "その他"],
-                        "name": "エリア: "
-                    },
-                    "value": "すべて"
-                },
-                {
-                    "name": "job_filter",
-                    "bind": {
-                        "input": "select",
-                        "options": ["すべて", "准看護師", "正看護師", "その他看護職", "非看護職・未分類"],
-                        "name": "職種: "
-                    },
-                    "value": "すべて"
-                }
-            ],
-            "transform": [
-                // 1. データクリーニング（NULLや無効データを除外）
-                {"filter": "datum['年間休日数'] !== null && datum['年間休日数'] > 0"},
-                
-                // 2. フィルタリング（JavaScriptで動的に挿入されます）
-                // 3. 集計/重複排除
-                {
-                    "aggregate": [
-                        {"op": "median", "field": "年間休日数", "as": "年間休日数（中央値）"}
-                    ],
-                    "groupby": ["事業所名", "区", "職種分類", "業種分類"]
-                },
-                // 4. ランキングと中央値の再計算
-                {
-                    "window": [{"op": "rank", "as": "順位"}],
-                    "sort": [{"field": "年間休日数（中央値）", "order": "ascending"}]
-                },
-                {
-                    "aggregate": [{"op": "median", "field": "年間休日数（中央値）", "as": "中央値_全体"}]
-                }
-            ],
-            "layer": [
-                // 中央値の横線
-                {
-                    "mark": {"type": "rule", "color": "red", "strokeDash": [5, 5]},
-                    "encoding": {
-                        "y": {"field": "中央値_全体", "type": "quantitative"},
-                        "tooltip": [
-                            {"field": "中央値_全体", "format": ".1f", "title": "中央値"}
-                        ]
-                    }
-                },
-                // 散布図のプロット
-                {
-                    "mark": {"type": "circle", "size": 60},
-                    "encoding": {
-                        "x": {"field": "順位", "title": "求人事業所 順位 (年間休日数中央値 昇順)"},
-                        "y": {"field": "年間休日数（中央値）", "title": "年間休日数（中央値） (日)"},
-                        "color": {"field": "職種分類", "type": "nominal", "title": "職種分類", "sort": ["正看護師", "准看護師", "その他看護職"]},
-                        "tooltip": [
-                            "事業所名",
-                            "区",
-                            "職種分類",
-                            "業種分類",
-                            {"field": "年間休日数（中央値）", "format": ".0f", "title": "休日数中央値"}
-                        ]
-                    }
-                }
-            ],
-            "config": {
-                "title": {"fontSize": 16},
-                "legend": {"titleFontSize": 12, "labelFontSize": 11}
-            }
-        };
-
-
+        // GitHub Pages上のJSONファイルのURLを指定
+        const JSON_SPEC_URL = "annual_holidays_scatter_plot_deduplicated.json";
+        
+        let originalSpec = null;
         const jobOrder = ["正看護師", "准看護師", "その他看護職"];
         const defaultDistricts = ["中央区", "東区", "西区", "南区", "北区", "その他"];
-        let dataLoaded = false;
 
+
+        async function initializeChart() {
+            try {
+                // 1. JSONファイルをフェッチ
+                const response = await fetch(JSON_SPEC_URL);
+                if (!response.ok) {
+                    throw new Error('JSONファイルを読み込めませんでした。ファイル名を確認してください: ' + response.statusText);
+                }
+                // 2. オリジナルスペックとして保存
+                originalSpec = await response.json();
+                
+                // 3. フィルタオプションを設定
+                setupFilterOptions();
+                
+                // 4. 初期グラフの描画
+                updateChart();
+
+            } catch (error) {
+                document.getElementById('vis').innerHTML = `<p style="color:red;">グラフの読み込みに失敗しました。JSONファイルが存在しないか、JSONの構文に問題があります。<br>エラー: ${error.message}</p>`;
+                console.error(error);
+            }
+        }
 
         function setupFilterOptions() {
             const districtSelect = document.getElementById('district-select');
             const jobSelect = document.getElementById('job-select');
 
+            // 選択肢の追加
             districtSelect.innerHTML = '<option value="すべて">すべて</option>';
             defaultDistricts.sort().forEach(district => {
                 districtSelect.innerHTML += `<option value="${district}">${district}</option>`;
@@ -138,37 +78,44 @@
         }
 
         function updateChart() {
-            // テンプレートをコピー
-            let spec = JSON.parse(JSON.stringify(vegaLiteSpecTemplate));
+            if (!originalSpec) return;
 
             const selectedDistrict = document.getElementById('district-select').value;
             const selectedJob = document.getElementById('job-select').value;
             
+            // テンプレートをコピーし、transformをリセット
+            let spec = JSON.parse(JSON.stringify(originalSpec));
+            // オリジナルのクリーニングトランスフォーム（[0]番目の要素）のみ残す
+            let baseTransforms = [spec.transform[0]]; 
+
             let filters = [];
             
             if (selectedDistrict !== "すべて") {
+                // フィルタロジックをVega-Lite形式で追加
                 filters.push({ field: "区", equal: selectedDistrict });
             }
             if (selectedJob !== "すべて") {
                 filters.push({ field: "職種分類", equal: selectedJob });
             }
 
-            // 既存のTransformにフィルタを挿入
+            // フィルタ処理をベーストランスフォームの直後（2番目）に挿入
             if (filters.length > 0) {
-                // フィルタを既存のクリーニングフィルタ(index 0)の直後に挿入
-                spec.transform.splice(1, 0, { filter: { and: filters } });
-                
-                // タイトルの更新
-                const districtText = selectedDistrict !== "すべて" ? selectedDistrict : '全エリア';
-                const jobText = selectedJob !== "すべて" ? selectedJob : '全職種';
-                spec.title = { text: `${districtText} ${jobText} 年間休日数散布図` };
-            } else {
-                 spec.title = "熊本市 各事業所の年間休日数散布図";
+                baseTransforms.push({ filter: { and: filters } });
             }
+
+            // フィルタ後の集計・ランキング処理を再挿入 (元の配列の[2], [3], [4]番目)
+            baseTransforms.push(spec.transform[2], spec.transform[3], spec.transform[4]);
+            spec.transform = baseTransforms;
+
+
+            // タイトルの更新
+            const districtText = selectedDistrict !== "すべて" ? selectedDistrict : '全エリア';
+            const jobText = selectedJob !== "すべて" ? selectedJob : '全職種';
+            spec.title = { text: `${districtText} ${jobText} 年間休日数散布図` };
             
             // グラフの描画
             vegaEmbed('#vis', spec, { mode: "vega-lite", actions: false }).catch(error => {
-                document.getElementById('vis').innerHTML = `<p style="color:red;">描画失敗: データ型またはヘッダーの不一致が原因です。${error.message}</p>`;
+                document.getElementById('vis').innerHTML = `<p style="color:red;">描画失敗: データ構造の問題、またはトランスフォーム処理のエラーです。${error.message}</p>`;
                 console.error(error);
             });
         }
