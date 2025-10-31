@@ -5,30 +5,9 @@
     "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5QjvstFqTzdOPORH62h7K_KCvwChYar9pJfWOfkWZ2HCoLrtLcZkzuahoosYpmafsEIBZM5az_7He/pub?gid=255864226&single=true&output=csv",
     "format": {"type": "csv"}
   },
-  "params": [
-    {
-      "name": "district_filter",
-      "bind": {
-        "input": "select",
-        "options": ["すべて", "中央区", "東区", "西区", "南区", "北区", "その他"],
-        "name": "エリア: "
-      },
-      "value": "すべて"
-    },
-    {
-      "name": "job_filter",
-      "bind": {
-        "input": "select",
-        "options": ["すべて", "准看護師", "正看護師", "その他看護職", "非看護職・未分類"],
-        "name": "職種: "
-      },
-      "value": "すべて"
-    }
-  ],
   "transform": [
     {"calculate": "toNumber(datum['年間休日数'])", "as": "年間休日数_数値"},
-    {"filter": "(datum.区 === district_filter) || (district_filter === 'すべて')"},
-    {"filter": "(datum.職種分類 === job_filter) || (job_filter === 'すべて')"},
+    // フィルタリングはHTML側のJavaScriptで処理されます。
     {"filter": "datum.年間休日数_数値 !== null"},
     {
       "aggregate": [
