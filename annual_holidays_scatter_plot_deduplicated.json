@@ -2,12 +2,11 @@
   "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
   "title": "熊本市 各事業所の年間休日数散布図",
   "data": {
-    "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5QjvstFqTzdOPORH62h7K_KCvwChYar9pJfWOfkWZ2HCoLrtLcZkzuahoosYpmafsEIBZM5az_7He/pub?gid=255864226&single=true&output=csv",
+    "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5QjvstFqTzdOPORH62h7K_KCvwChYar9pJfWOfkWZ2HCoLrtLcZkzuahoosYpmafsEIBZM5az_7He/pub?gid=787523519&single=true&output=csv",
     "format": {"type": "csv"}
   },
   "transform": [
     {"calculate": "toNumber(datum['年間休日数'])", "as": "年間休日数_数値"},
-    // フィルタリングはHTML側のJavaScriptで処理されます。
     {"filter": "datum.年間休日数_数値 !== null"},
     {
       "aggregate": [
