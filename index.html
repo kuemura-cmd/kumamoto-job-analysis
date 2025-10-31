@@ -6,7 +6,7 @@
     <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
     <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
     <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
-    <style>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script> <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; }
         h1 { color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; }
         .controls { margin-bottom: 20px; padding: 15px; background-color: #f9f9f9; border-radius: 5px; }
@@ -30,13 +30,13 @@
     <div id="vis"></div>
 
     <script>
-	// index.htmlの修正箇所
-	// JSON_SPEC_URLを以下のURLに置き換えてください
-
-	const JSON_SPEC_URL = "https://kuemura-cmd.github.io/kumamoto-job-	analysis/annual_holidays_scatter_plot_deduplicated.json";
+        // ★★★ あなたの公開URLに置き換え済み ★★★
+        const JSON_SPEC_URL = "https://kuemura-cmd.github.io/kumamoto-job-analysis/annual_holidays_scatter_plot_deduplicated.json"; 
+        const DATA_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5QjvstFqTzdOPORH62h7K_KCvwChYar9pJfWOfkWZ2HCoLrtLcZkzuahoosYpmafsEIBZM5az_7He/pub?gid=255864226&single=true&output=csv";
         
         let originalSpec = null;
         const jobOrder = ["正看護師", "准看護師", "その他看護職"];
+        const defaultDistricts = ["中央区", "東区", "西区", "南区", "北区", "その他"];
 
         // ------------------------------------
         // 1. グラフ定義ファイルを読み込み、初期表示とフィルタのオプションを設定する
@@ -50,8 +50,8 @@
                 }
                 originalSpec = await response.json();
                 
-                // フィルタリングオプションの準備
-                setupFilterOptions(originalSpec.data.values);
+                // データURLから直接オプションを生成
+                setupFilterOptions();
                 
                 // 初期グラフの描画
                 updateChart();
@@ -63,24 +63,24 @@
         }
 
         // ------------------------------------
-        // 2. フィルタリングのドロップダウンオプションを設定する
+        // 2. CSVファイルからオプションを設定する (データ読み込み処理を分離)
         // ------------------------------------
-        function setupFilterOptions(data) {
-            const districts = new Set(data.map(d => d.区));
+        function setupFilterOptions() {
             const districtSelect = document.getElementById('district-select');
-            
+            const jobSelect = document.getElementById('job-select');
+
             // エリアフィルターのオプション設定
             districtSelect.innerHTML = '<option value="すべて">すべて</option>';
-            [...districts].sort().forEach(district => {
+            defaultDistricts.sort().forEach(district => {
                 districtSelect.innerHTML += `<option value="${district}">${district}</option>`;
             });
 
             // 職種フィルターのオプション設定
-            const jobSelect = document.getElementById('job-select');
             jobSelect.innerHTML = '<option value="すべて">すべて</option>';
             jobOrder.forEach(job => {
                 jobSelect.innerHTML += `<option value="${job}">${job}</option>`;
             });
+             jobSelect.innerHTML += '<option value="非看護職・未分類">非看護職・未分類</option>';
         }
 
         // ------------------------------------
@@ -92,40 +92,32 @@
             const selectedDistrict = document.getElementById('district-select').value;
             const selectedJob = document.getElementById('job-select').value;
             
-            // 元のグラフ定義をディープコピー
             let filteredSpec = JSON.parse(JSON.stringify(originalSpec));
 
-            // フィルタリング処理の追加
             let filters = [];
+            
+            // JSONファイル側のデータソースが "data_source" に依存しないように修正
+            // フィルタリングはVega-LiteのTransform機能に任せます
             
             if (selectedDistrict !== "すべて") {
                 filters.push({ field: "区", equal: selectedDistrict });
             }
             if (selectedJob !== "すべて") {
-                filters.push({ field: "分類", equal: selectedJob });
+                filters.push({ field: "職種分類", equal: selectedJob }); // 職種分類フィールドを使用
             }
 
-            // フィルタが適用されるデータ変換 (Transform) を定義
-            filteredSpec.data.format = { type: "json" };
-            filteredSpec.data.transform = [];
-            
+            // フィルタ処理をTransformの先頭に追加
             if (filters.length > 0) {
-                // フィルタリングを追加
-                filteredSpec.data.transform.push({ filter: { and: filters } });
+                // 既存のTransformを維持しつつ、フィルタを先頭に追加する
+                const existingTransforms = filteredSpec.transform || [];
+                filteredSpec.transform = [{ filter: { and: filters } }, ...existingTransforms];
                 
-                // フィルタリング後のデータで順位を再計算 (X軸のプロット位置を調整)
-                filteredSpec.data.transform.push({
-                    window: [{ op: "rank", as: "順位" }],
-                    sort: [{ field: "年間休日数（中央値）", order: "ascending" }]
-                });
-
-                // 中央値の再計算 (フィルタリングされたデータの中央値を計算し、赤い線の位置を更新)
-                filteredSpec.data.transform.push({
-                    aggregate: [{ op: "median", field: "年間休日数（中央値）", as: "中央値" }]
-                });
-
-                // グラフのタイトルも更新
-                filteredSpec.title = { text: `${selectedDistrict !== "すべて" ? selectedDistrict : '全エリア'} ${selectedJob !== "すべて" ? selectedJob : '全職種'} 年間休日数散布図` };
+                // タイトルの更新
+                const districtText = selectedDistrict !== "すべて" ? selectedDistrict : '全エリア';
+                const jobText = selectedJob !== "すべて" ? selectedJob : '全職種';
+                filteredSpec.title = { text: `${districtText} ${jobText} 年間休日数散布図` };
+            } else {
+                 filteredSpec.title = "熊本市 各事業所の年間休日数散布図";
             }
             
             // グラフの描画
