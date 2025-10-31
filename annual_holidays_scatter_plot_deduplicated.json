@@ -2,24 +2,25 @@
   "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
   "title": "熊本市 各事業所の年間休日数散布図",
   "data": {
-    "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5QjvstFqTzdOPORH62h7K_KCvwChYar9pJfWOfkWZ2HCoLrtLcZkzuahoosYpmafsEIBZM5az_7He/pub?gid=255864226&single=true&output=csv",
+    "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5QjvstFqTzdOPORH62h7K_KCvwChYar9pJfWOfkWZ2HCoLrtLcZkzuahoosYpmafsEIBZM5az_7He/pub?gid=787523519&single=true&output=csv",
     "format": {
       "type": "csv"
     }
   },
+  // ★ JSONからparamsを完全に削除 ★
   "transform": [
-    // データクリーニングとフィルタリング
+    // 1. データクリーニング（NULLや無効データを除外）
     {"filter": "datum['年間休日数'] !== null && datum['年間休日数'] > 0"},
-    // ★ HTMLのJSで動的にフィルタが挿入されます
+    // ★ フィルタはJavaScriptで動的に挿入されます
     
-    // 集計/重複排除
+    // 2. 集計/重複排除
     {
       "aggregate": [
         {"op": "median", "field": "年間休日数", "as": "年間休日数（中央値）"}
       ],
       "groupby": ["事業所名", "区", "職種分類", "業種分類"]
     },
-    // ランキングと中央値の再計算
+    // 3. ランキングと中央値の再計算
     {
       "window": [{"op": "rank", "as": "順位"}],
       "sort": [{"field": "年間休日数（中央値）", "order": "ascending"}]
