@@ -50,7 +50,7 @@
       "data": {"source": "data_source"},
       "transform": [
         {"aggregate": [{"op": "median", "field": "年間休日数（中央値）", "as": "中央値_全体"}]},
-        {"calculate": "'全体中央値'", "as": "tooltip_label"}
+        {"calculate": "'全体中央値'","as": "tooltip_label"}
       ],
       "mark": {"type": "rule", "color": "red", "strokeDash": [5, 5]},
       "encoding": {
