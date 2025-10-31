@@ -1,131 +1,177 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <title>年間休日数 競争力比較 - 熊本市</title>
-        <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; }
-        h1 { color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        #vis { margin-top: 30px; }
-    </style>
+    <meta charset="UTF-8">
+    <title>年間休日数 競争力比較 - 熊本市</title>
+    <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; }
+        h1 { color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .controls { margin-bottom: 20px; padding: 15px; background-color: #f9f9f9; border-radius: 5px; }
+        .controls label { margin-right: 20px; font-weight: bold; }
+        .controls select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
+        #vis { margin-top: 30px; }
+    </style>
 </head>
 <body>
 
-    <h1>熊本市 各事業所の年間休日数 競争力散布図</h1>
+    <h1>熊本市 各事業所の年間休日数 競争力散布図</h1>
 
-    <div id="vis"></div>
+    <div class="controls">
+        <label for="district-select">エリアで絞り込む:</label>
+        <select id="district-select" onchange="updateChart()"></select>
 
-    <script>
+        <label for="job-select">職種で絞り込む:</label>
+        <select id="job-select" onchange="updateChart()"></select>
+    </div>
+
+    <div id="vis"></div>
+
+    <script>
         // グラフ定義をJavaScriptオブジェクトとしてインライン化
-        const vegaLiteSpec = {
-          "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
-          "title": "熊本市 各事業所の年間休日数散布図",
-          "data": {
-            "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5QjvstFqTzdOPORH62h7K_KCvwChYar9pJfWOfkWZ2HCoLrtLcZkzuahoosYpmafsEIBZM5az_7He/pub?gid=787523519&single=true&output=csv",
-            "format": {
-              "type": "csv",
-              "parse": {
-                "年間休日数": "number",
-                "区": "string",
-                "職種分類": "string",
-                "業種分類": "string",
-                "事業所名": "string"
-              }
-            }
-          },
-          "params": [
-            {
-              "name": "district_filter",
-              "bind": {
-                "input": "select",
-                "options": ["すべて", "中央区", "東区", "西区", "南区", "北区", "その他"],
-                "name": "エリア: "
-              },
-              "value": "すべて"
-            },
-            {
-              "name": "job_filter",
-              "bind": {
-                "input": "select",
-                "options": ["すべて", "准看護師", "正看護師", "その他看護職", "非看護職・未分類"],
-                "name": "職種: "
-              },
-              "value": "すべて"
-            }
-          ],
-          "transform": [
-            {"filter": "datum['年間休日数'] !== null && datum['年間休日数'] > 0"},
-            {"filter": "(datum['区'] === district_filter) || (district_filter === 'すべて')"},
-            {"filter": "(datum['職種分類'] === job_filter) || (job_filter === 'すべて')"},
-            {
-              "aggregate": [
-                {"op": "median", "field": "年間休日数", "as": "年間休日数（中央値）"}
-              ],
-              "groupby": ["事業所名", "区", "職種分類", "業種分類"]
-            },
-            {
-              "aggregate": [{"op": "median", "field": "年間休日数（中央値）", "as": "中央値_全体"}],
-              "as": ["中央値_全体"]
-            },
-            {
-              "window": [{"op": "rank", "as": "順位"}],
-              "sort": [{"field": "年間休日数（中央値）", "order": "ascending"}]
-            }
-          ],
-          "layer": [
-            {
-              "data": {"source": "data_0"},
-              "transform": [
-                {"aggregate": [{"op": "median", "field": "年間休日数（中央値）", "as": "中央値_全体"}]},
-                {"calculate": "'全体中央値'","as": "tooltip_label"}
-              ],
-              "mark": {"type": "rule", "color": "red", "strokeDash": [5, 5]},
-              "encoding": {
-                "y": {"field": "中央値_全体", "type": "quantitative"},
-                "tooltip": [
-                  {"field": "tooltip_label", "type": "nominal", "title": "中央値"},
-                  {"field": "中央値_全体", "format": ".1f", "title": "休日数"}
-                ]
-              }
-            },
-            {
-              "mark": {"type": "circle", "size": 60},
-              "encoding": {
-                "x": {"field": "順位", "title": "求人事業所 順位 (年間休日数中央値 昇順)"},
-                "y": {"field": "年間休日数（中央値）", "title": "年間休日数（中央値） (日)"},
-                "color": {"field": "職種分類", "type": "nominal", "title": "職種分類", "sort": ["正看護師", "准看護師", "その他看護職"]},
-                "tooltip": [
-                  "事業所名",
-                  "区",
-                  "職種分類",
-                  "業種分類",
-                  {"field": "年間休日数（中央値）", "format": ".0f", "title": "休日数中央値"}
-                ]
-              }
-            }
-          ],
-          "config": {
-            "title": {"fontSize": 16},
-            "legend": {"titleFontSize": 12, "labelFontSize": 11}
-          }
-        };
+        const vegaLiteSpecTemplate = {
+            "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+            "title": "熊本市 各事業所の年間休日数散布図",
+            "data": {
+                "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5QjvstFqTzdOPORH62h7K_KCvwChYar9pJfWOfkWZ2HCoLrtLcZkzuahoosYpmafsEIBZM5az_7He/pub?gid=787523519&single=true&output=csv",
+                "format": {
+                    "type": "csv",
+                    "parse": {
+                        "年間休日数": "number", // 読み込み時に型を強制
+                        "区": "string",
+                        "職種分類": "string",
+                        "業種分類": "string",
+                        "事業所名": "string"
+                    }
+                }
+            },
+            "transform": [
+                // 1. データクリーニング（NULLや無効データを除外）
+                {"filter": "datum['年間休日数'] !== null && datum['年間休日数'] > 0"},
+                
+                // 2. フィルタリング（JavaScriptで動的に挿入されます）
+                // 3. 集計/重複排除
+                {
+                    "aggregate": [
+                        {"op": "median", "field": "年間休日数", "as": "年間休日数（中央値）"}
+                    ],
+                    "groupby": ["事業所名", "区", "職種分類", "業種分類"]
+                },
+                // 4. ランキングと中央値の再計算
+                {
+                    "window": [{"op": "rank", "as": "順位"}],
+                    "sort": [{"field": "年間休日数（中央値）", "order": "ascending"}]
+                },
+                {
+                    "aggregate": [{"op": "median", "field": "年間休日数（中央値）", "as": "中央値_全体"}]
+                }
+            ],
+            "layer": [
+                // 中央値の横線
+                {
+                    "mark": {"type": "rule", "color": "red", "strokeDash": [5, 5]},
+                    "encoding": {
+                        "y": {"field": "中央値_全体", "type": "quantitative"},
+                        "tooltip": [
+                            {"field": "中央値_全体", "format": ".1f", "title": "中央値"}
+                        ]
+                    }
+                },
+                // 散布図のプロット
+                {
+                    "mark": {"type": "circle", "size": 60},
+                    "encoding": {
+                        "x": {"field": "順位", "title": "求人事業所 順位 (年間休日数中央値 昇順)"},
+                        "y": {"field": "年間休日数（中央値）", "title": "年間休日数（中央値） (日)"},
+                        "color": {"field": "職種分類", "type": "nominal", "title": "職種分類", "sort": ["正看護師", "准看護師", "その他看護職"]},
+                        "tooltip": [
+                            "事業所名",
+                            "区",
+                            "職種分類",
+                            "業種分類",
+                            {"field": "年間休日数（中央値）", "format": ".0f", "title": "休日数中央値"}
+                        ]
+                    }
+                }
+            ],
+            "config": {
+                "title": {"fontSize": 16},
+                "legend": {"titleFontSize": 12, "labelFontSize": 11}
+            }
+        };
 
-        function initializeChart() {
-            try {
-                // JavaScriptオブジェクトとして定義したスペックを直接埋め込む
-                vegaEmbed('#vis', vegaLiteSpec, { mode: "vega-lite", actions: false }).catch(console.error);
 
-            } catch (error) {
-                document.getElementById('vis').innerHTML = `<p style="color:red;">グラフの読み込みに失敗しました。JSONの構文またはデータヘッダーをご確認ください: ${error.message}</p>`;
-                console.error(error);
-            }
-        }
+        const jobOrder = ["正看護師", "准看護師", "その他看護職"];
+        const defaultDistricts = ["中央区", "東区", "西区", "南区", "北区", "その他"];
+        let dataLoaded = false;
 
-        window.onload = initializeChart;
-    </script>
+
+        async function initializeChart() {
+            // 初期化時にフィルタオプションを設定
+            setupFilterOptions();
+            
+            // データ処理が成功するのを待ってからグラフを更新
+            updateChart();
+            dataLoaded = true;
+        }
+
+        function setupFilterOptions() {
+            const districtSelect = document.getElementById('district-select');
+            const jobSelect = document.getElementById('job-select');
+
+            districtSelect.innerHTML = '<option value="すべて">すべて</option>';
+            defaultDistricts.sort().forEach(district => {
+                districtSelect.innerHTML += `<option value="${district}">${district}</option>`;
+            });
+
+            jobSelect.innerHTML = '<option value="すべて">すべて</option>';
+            jobOrder.forEach(job => {
+                jobSelect.innerHTML += `<option value="${job}">${job}</option>`;
+            });
+            jobSelect.innerHTML += '<option value="非看護職・未分類">非看護職・未分類</option>';
+        }
+
+        function updateChart() {
+            // テンプレートをコピー
+            let spec = JSON.parse(JSON.stringify(vegaLiteSpecTemplate));
+
+            const selectedDistrict = document.getElementById('district-select').value;
+            const selectedJob = document.getElementById('job-select').value;
+            
+            let filters = [];
+            
+            if (selectedDistrict !== "すべて") {
+                filters.push({ field: "区", equal: selectedDistrict });
+            }
+            if (selectedJob !== "すべて") {
+                filters.push({ field: "職種分類", equal: selectedJob });
+            }
+
+            // 既存のTransformにフィルタを挿入
+            if (filters.length > 0) {
+                const existingTransforms = spec.transform || [];
+                // フィルタを既存のクリーニングフィルタ(index 0)の直後に挿入
+                spec.transform.splice(1, 0, { filter: { and: filters } });
+                
+                // タイトルの更新
+                const districtText = selectedDistrict !== "すべて" ? selectedDistrict : '全エリア';
+                const jobText = selectedJob !== "すべて" ? selectedJob : '全職種';
+                spec.title = { text: `${districtText} ${jobText} 年間休日数散布図` };
+            } else {
+                 spec.title = "熊本市 各事業所の年間休日数散布図";
+            }
+            
+            // グラフの描画
+            vegaEmbed('#vis', spec, { mode: "vega-lite", actions: false }).catch(error => {
+                document.getElementById('vis').innerHTML = `<p style="color:red;">描画失敗: データ型またはヘッダーの不一致が原因です。${error.message}</p>`;
+                console.error(error);
+            });
+        }
+
+        window.onload = initializeChart;
+    </script>
 
 </body>
 </html>
