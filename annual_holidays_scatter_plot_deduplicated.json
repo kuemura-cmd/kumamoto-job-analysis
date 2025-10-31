@@ -26,16 +26,18 @@
     }
   ],
   "transform": [
+    // 1. 年間休日数（全角）の数値変換にブラケット記法を使用
     {"calculate": "toNumber(datum['年間休日数'])", "as": "年間休日数_数値"},
-    // フィルタリングをJSON内部で実行
-    {"filter": "(datum.区 === district_filter) || (district_filter === 'すべて')"},
-    {"filter": "(datum.職種分類 === job_filter) || (job_filter === 'すべて')"},
+    // 2. フィルタリングにもブラケット記法を使用
+    {"filter": "(datum['区'] === district_filter) || (district_filter === 'すべて')"},
+    {"filter": "(datum['職種分類'] === job_filter) || (job_filter === 'すべて')"},
     
     {"filter": "datum.年間休日数_数値 !== null"},
     {
       "aggregate": [
         {"op": "median", "field": "年間休日数_数値", "as": "年間休日数（中央値）"}
       ],
+      // 3. グループ化の基準も全角文字を含むため、整合性を保つ
       "groupby": ["事業所名", "区", "職種分類", "業種分類"]
     },
     {
