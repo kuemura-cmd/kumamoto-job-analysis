@@ -26,41 +26,49 @@
     }
   ],
   "transform": [
+    // 1. データクリーニング
     {"calculate": "toNumber(datum['年間休日数'])", "as": "年間休日数_数値"},
+    {"filter": "datum.年間休日数_数値 !== null"},
+
+    // 2. フィルタリング (パラメータ連携)
     {"filter": "(datum['区'] === district_filter) || (district_filter === 'すべて')"},
     {"filter": "(datum['職種分類'] === job_filter) || (job_filter === 'すべて')"},
-    {"filter": "datum.年間休日数_数値 !== null"},
+
+    // 3. 重複排除と中央値計算 (Aggregation)
     {
       "aggregate": [
         {"op": "median", "field": "年間休日数_数値", "as": "年間休日数（中央値）"}
       ],
       "groupby": ["事業所名", "区", "職種分類", "業種分類"]
     },
-    {
-      "aggregate": [{"op": "median", "field": "年間休日数（中央値）", "as": "中央値_全体"}],
-      "as": ["中央値_全体"]
-    },
+
+    // 4. ランキングの計算 (X軸のプロット順位を再計算)
     {
       "window": [{"op": "rank", "as": "順位"}],
       "sort": [{"field": "年間休日数（中央値）", "order": "ascending"}]
+    },
+    
+    // 5. 全体中央値の計算 (Median Line)
+    {
+      "aggregate": [{"op": "median", "field": "年間休日数（中央値）", "as": "中央値_全体"}],
+      "as": ["中央値_全体"]
     }
   ],
   "layer": [
+    // 中央値の横線 (全体のデータを使って描画)
     {
-      "data": {"source": "data_source"},
+      "data": {"source": "data_0"},
       "transform": [
         {"aggregate": [{"op": "median", "field": "年間休日数（中央値）", "as": "中央値_全体"}]},
-        {"calculate": "'全体中央値'","as": "tooltip_label"}
+        {"calculate": "'中央値'", "as": "tooltip_label"}
       ],
       "mark": {"type": "rule", "color": "red", "strokeDash": [5, 5]},
       "encoding": {
         "y": {"field": "中央値_全体", "type": "quantitative"},
-        "tooltip": [
-          {"field": "tooltip_label", "type": "nominal", "title": "中央値"},
-          {"field": "中央値_全体", "format": ".1f", "title": "休日数"}
-        ]
+        "tooltip": [{"field": "tooltip_label", "type": "nominal", "title": "基準"}, {"field": "中央値_全体", "format": ".1f", "title": "休日数"}]
       }
     },
+    // 散布図のプロット (フィルタ・ソート済みのデータを使って描画)
     {
       "mark": {"type": "circle", "size": 60},
       "encoding": {
