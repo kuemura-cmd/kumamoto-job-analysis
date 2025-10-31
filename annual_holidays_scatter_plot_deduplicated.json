@@ -5,7 +5,6 @@
     "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5QjvstFqTzdOPORH62h7K_KCvwChYar9pJfWOfkWZ2HCoLrtLcZkzuahoosYpmafsEIBZM5az_7He/pub?gid=787523519&single=true&output=csv",
     "format": {
       "type": "csv",
-      // データ型を事前に明示的に指定
       "parse": {
         "年間休日数": "number",
         "区": "string",
@@ -36,22 +35,15 @@
     }
   ],
   "transform": [
-    // 1. 年間休日数が0より大きいことを確認し、NULLを削除
     {"filter": "datum['年間休日数'] !== null && datum['年間休日数'] > 0"},
-    
-    // 2. フィルタリングを実行
     {"filter": "(datum['区'] === district_filter) || (district_filter === 'すべて')"},
     {"filter": "(datum['職種分類'] === job_filter) || (job_filter === 'すべて')"},
-    
-    // 3. 集計/重複排除
     {
       "aggregate": [
         {"op": "median", "field": "年間休日数", "as": "年間休日数（中央値）"}
       ],
       "groupby": ["事業所名", "区", "職種分類", "業種分類"]
     },
-    
-    // 4. ランキングと中央値の再計算
     {
       "aggregate": [{"op": "median", "field": "年間休日数（中央値）", "as": "中央値_全体"}],
       "as": ["中央値_全体"]
@@ -66,7 +58,7 @@
       "data": {"source": "data_0"},
       "transform": [
         {"aggregate": [{"op": "median", "field": "年間休日数（中央値）", "as": "中央値_全体"}]},
-        {"calculate": "'全体中央値'", "as": "tooltip_label"}
+        {"calculate": "'全体中央値'","as": "tooltip_label"}
       ],
       "mark": {"type": "rule", "color": "red", "strokeDash": [5, 5]},
       "encoding": {
