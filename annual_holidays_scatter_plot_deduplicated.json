@@ -5,10 +5,13 @@
     "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5QjvstFqTzdOPORH62h7K_KCvwChYar9pJfWOfkWZ2HCoLrtLcZkzuahoosYpmafsEIBZM5az_7He/pub?gid=787523519&single=true&output=csv",
     "format": {
       "type": "csv",
-      // データ型を事前に指定し、読み込みエラーを防ぐ
+      // データ型を事前に明示的に指定
       "parse": {
         "年間休日数": "number",
-        "年間休日数（中央値）": "number"
+        "区": "string",
+        "職種分類": "string",
+        "業種分類": "string",
+        "事業所名": "string"
       }
     }
   },
@@ -33,7 +36,7 @@
     }
   ],
   "transform": [
-    // 1. 年間休日数でNULLや0のデータをフィルタリング
+    // 1. 年間休日数が0より大きいことを確認し、NULLを削除
     {"filter": "datum['年間休日数'] !== null && datum['年間休日数'] > 0"},
     
     // 2. フィルタリングを実行
