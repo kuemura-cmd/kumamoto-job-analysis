@@ -43,7 +43,7 @@
                 // 1. JSONファイルをフェッチ
                 const response = await fetch(JSON_SPEC_URL);
                 if (!response.ok) {
-                    throw new Error('JSONファイルを読み込めませんでした。ファイル名を確認してください: ' + response.statusText);
+                    throw new Error('JSONファイルを読み込めませんでした: ' + response.statusText);
                 }
                 // 2. オリジナルスペックとして保存
                 originalSpec = await response.json();
@@ -85,6 +85,7 @@
             
             // テンプレートをコピーし、transformをリセット
             let spec = JSON.parse(JSON.stringify(originalSpec));
+            
             // オリジナルのクリーニングトランスフォーム（[0]番目の要素）のみ残す
             let baseTransforms = [spec.transform[0]]; 
 
