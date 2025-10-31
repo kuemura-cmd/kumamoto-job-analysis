@@ -26,42 +26,26 @@
     }
   ],
   "transform": [
-    // 1. データ型を数値に変換（年間休日数が文字列の場合があるため）
-    {"calculate": "toNumber(datum.年間休日数)", "as": "年間休日数_数値"},
-    
-    // 2. フィルタリング (ユーザー選択と無効データ除外)
-    {
-      "filter": "(datum.区 === district_filter) || (district_filter === 'すべて')"
-    },
-    {
-      "filter": "(datum.職種分類 === job_filter) || (job_filter === 'すべて')"
-    },
-    {
-      "filter": "datum.年間休日数_数値 !== null" // 休日数がnullのデータをフィルタリング
-    },
-
-    // 3. 集計/重複排除: 事業所名、区、分類、業種分類ごとに中央値を算出
+    {"calculate": "toNumber(datum['年間休日数'])", "as": "年間休日数_数値"},
+    {"filter": "(datum.区 === district_filter) || (district_filter === 'すべて')"},
+    {"filter": "(datum.職種分類 === job_filter) || (job_filter === 'すべて')"},
+    {"filter": "datum.年間休日数_数値 !== null"},
     {
       "aggregate": [
         {"op": "median", "field": "年間休日数_数値", "as": "年間休日数（中央値）"}
       ],
       "groupby": ["事業所名", "区", "職種分類", "業種分類"]
     },
-    
-    // 4. 全体中央値の計算 (フィルタリングされた集計データの中央値を計算)
     {
       "aggregate": [{"op": "median", "field": "年間休日数（中央値）", "as": "中央値_全体"}],
       "as": ["中央値_全体"]
     },
-
-    // 5. ランキングの計算 (X軸のプロット順位)
     {
       "window": [{"op": "rank", "as": "順位"}],
       "sort": [{"field": "年間休日数（中央値）", "order": "ascending"}]
     }
   ],
   "layer": [
-    // 中央値の横線
     {
       "data": {"source": "data_source"},
       "transform": [
@@ -77,7 +61,6 @@
         ]
       }
     },
-    // 散布図のプロット
     {
       "mark": {"type": "circle", "size": 60},
       "encoding": {
