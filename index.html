@@ -37,16 +37,29 @@
             "data": {
                 "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5QjvstFqTzdOPORH62h7K_KCvwChYar9pJfWOfkWZ2HCoLrtLcZkzuahoosYpmafsEIBZM5az_7He/pub?gid=787523519&single=true&output=csv",
                 "format": {
-                    "type": "csv",
-                    "parse": {
-                        "年間休日数": "number", // 読み込み時に型を強制
-                        "区": "string",
-                        "職種分類": "string",
-                        "業種分類": "string",
-                        "事業所名": "string"
-                    }
+                    "type": "csv" 
                 }
             },
+            "params": [
+                {
+                    "name": "district_filter",
+                    "bind": {
+                        "input": "select",
+                        "options": ["すべて", "中央区", "東区", "西区", "南区", "北区", "その他"],
+                        "name": "エリア: "
+                    },
+                    "value": "すべて"
+                },
+                {
+                    "name": "job_filter",
+                    "bind": {
+                        "input": "select",
+                        "options": ["すべて", "准看護師", "正看護師", "その他看護職", "非看護職・未分類"],
+                        "name": "職種: "
+                    },
+                    "value": "すべて"
+                }
+            ],
             "transform": [
                 // 1. データクリーニング（NULLや無効データを除外）
                 {"filter": "datum['年間休日数'] !== null && datum['年間休日数'] > 0"},
@@ -108,15 +121,6 @@
         let dataLoaded = false;
 
 
-        async function initializeChart() {
-            // 初期化時にフィルタオプションを設定
-            setupFilterOptions();
-            
-            // データ処理が成功するのを待ってからグラフを更新
-            updateChart();
-            dataLoaded = true;
-        }
-
         function setupFilterOptions() {
             const districtSelect = document.getElementById('district-select');
             const jobSelect = document.getElementById('job-select');
@@ -151,7 +155,6 @@
 
             // 既存のTransformにフィルタを挿入
             if (filters.length > 0) {
-                const existingTransforms = spec.transform || [];
                 // フィルタを既存のクリーニングフィルタ(index 0)の直後に挿入
                 spec.transform.splice(1, 0, { filter: { and: filters } });
                 
