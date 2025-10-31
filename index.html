@@ -44,14 +44,15 @@
                 // 1. データクリーニング（NULLや無効データを除外）
                 {"filter": "datum['年間休日数'] !== null && datum['年間休日数'] > 0"},
                 
-                // 2. 集計/重複排除
+                // 2. フィルタリング（JavaScriptで動的に挿入されます）
+                // 3. 集計/重複排除
                 {
                     "aggregate": [
                         {"op": "median", "field": "年間休日数", "as": "年間休日数（中央値）"}
                     ],
                     "groupby": ["事業所名", "区", "職種分類", "業種分類"]
                 },
-                // 3. ランキングと中央値の再計算
+                // 4. ランキングと中央値の再計算
                 {
                     "window": [{"op": "rank", "as": "順位"}],
                     "sort": [{"field": "年間休日数（中央値）", "order": "ascending"}]
@@ -101,7 +102,7 @@
 
         function initializeChart() {
             setupFilterOptions();
-            updateChart(); // 初期グラフの描画
+            updateChart(); 
         }
 
         function setupFilterOptions() {
@@ -110,7 +111,6 @@
 
             if (!districtSelect || !jobSelect) return;
 
-            // 選択肢の追加
             districtSelect.innerHTML = '<option value="すべて">すべて</option>';
             defaultDistricts.sort().forEach(district => {
                 districtSelect.innerHTML += `<option value="${district}">${district}</option>`;
@@ -129,9 +129,9 @@
             const selectedDistrict = document.getElementById('district-select').value;
             const selectedJob = document.getElementById('job-select').value;
             
+            // フィルタリング処理に必要なデータ型を考慮し、filters配列を構築
             let filters = [];
             
-            // フィルタの条件設定
             if (selectedDistrict !== "すべて") {
                 filters.push({ field: "区", equal: selectedDistrict });
             }
@@ -139,25 +139,18 @@
                 filters.push({ field: "職種分類", equal: selectedJob });
             }
 
-            // Transform配列の再構築
-            let newTransforms = [spec.transform[0]]; // 最初のクリーニングフィルタのみをベースとする
-            
-            // フィルタロジックを挿入
+            // 1. フィルタリングロジックを挿入する
             if (filters.length > 0) {
-                newTransforms.push({ filter: { and: filters } });
+                // 最初のクリーニングフィルタ（0番目）の直後（1番目の位置）に挿入する
+                spec.transform.splice(1, 0, { filter: { and: filters } });
+
+                // 2. タイトルを更新
+                const districtText = selectedDistrict !== "すべて" ? selectedDistrict : '全エリア';
+                const jobText = selectedJob !== "すべて" ? selectedJob : '全職種';
+                spec.title = { text: `${districtText} ${jobText} 年間休日数散布図` };
+            } else {
+                 spec.title = "熊本市 各事業所の年間休日数散布図";
             }
-
-            // フィルタ後の集計・ランキング処理を挿入
-            // 元のtransform配列の [1]、[2]、[3] 番目（集計、ランキング、中央値計算）
-            newTransforms.push(spec.transform[1], spec.transform[2], spec.transform[3]);
-            
-            spec.transform = newTransforms; // 新しいTransform配列を適用
-
-
-            // タイトルの更新
-            const districtText = selectedDistrict !== "すべて" ? selectedDistrict : '全エリア';
-            const jobText = selectedJob !== "すべて" ? selectedJob : '全職種';
-            spec.title = { text: `${districtText} ${jobText} 年間休日数散布図` };
             
             // グラフの描画
             vegaEmbed('#vis', spec, { mode: "vega-lite", actions: false }).catch(error => {
