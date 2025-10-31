@@ -3,7 +3,14 @@
   "title": "熊本市 各事業所の年間休日数散布図",
   "data": {
     "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5QjvstFqTzdOPORH62h7K_KCvwChYar9pJfWOfkWZ2HCoLrtLcZkzuahoosYpmafsEIBZM5az_7He/pub?gid=787523519&single=true&output=csv",
-    "format": {"type": "csv"}
+    "format": {
+      "type": "csv",
+      // データ型を事前に指定し、読み込みエラーを防ぐ
+      "parse": {
+        "年間休日数": "number",
+        "年間休日数（中央値）": "number"
+      }
+    }
   },
   "params": [
     {
@@ -26,25 +33,22 @@
     }
   ],
   "transform": [
-    // 1. 年間休日数を厳密に数値に変換。非数値はNULLにする
-    {"calculate": "isValid(toNumber(datum['年間休日数'])) ? toNumber(datum['年間休日数']) : null", "as": "年間休日数_数値"},
+    // 1. 年間休日数でNULLや0のデータをフィルタリング
+    {"filter": "datum['年間休日数'] !== null && datum['年間休日数'] > 0"},
     
     // 2. フィルタリングを実行
     {"filter": "(datum['区'] === district_filter) || (district_filter === 'すべて')"},
     {"filter": "(datum['職種分類'] === job_filter) || (job_filter === 'すべて')"},
     
-    // 3. NULLデータを完全に除外
-    {"filter": "datum.年間休日数_数値 !== null"},
-    
-    // 4. 集計と重複排除
+    // 3. 集計/重複排除
     {
       "aggregate": [
-        {"op": "median", "field": "年間休日数_数値", "as": "年間休日数（中央値）"}
+        {"op": "median", "field": "年間休日数", "as": "年間休日数（中央値）"}
       ],
       "groupby": ["事業所名", "区", "職種分類", "業種分類"]
     },
     
-    // 5. ランキングと中央値の再計算
+    // 4. ランキングと中央値の再計算
     {
       "aggregate": [{"op": "median", "field": "年間休日数（中央値）", "as": "中央値_全体"}],
       "as": ["中央値_全体"]
@@ -56,7 +60,7 @@
   ],
   "layer": [
     {
-      "data": {"source": "data_source"},
+      "data": {"source": "data_0"},
       "transform": [
         {"aggregate": [{"op": "median", "field": "年間休日数（中央値）", "as": "中央値_全体"}]},
         {"calculate": "'全体中央値'", "as": "tooltip_label"}
