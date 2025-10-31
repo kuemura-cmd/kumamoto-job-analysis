@@ -1,47 +1,131 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <title>年間休日数 競争力比較 - 熊本市</title>
-    <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; }
-        h1 { color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-        /* フィルタUIはJSONが自動生成するので、HTML側の手動UIは削除 */
-        #vis { margin-top: 30px; }
-    </style>
+    <meta charset="UTF-8">
+    <title>年間休日数 競争力比較 - 熊本市</title>
+        <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; }
+        h1 { color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        #vis { margin-top: 30px; }
+    </style>
 </head>
 <body>
 
-    <h1>熊本市 各事業所の年間休日数 競争力散布図</h1>
+    <h1>熊本市 各事業所の年間休日数 競争力散布図</h1>
 
-    <div id="vis"></div>
+    <div id="vis"></div>
 
-    <script>
-        const JSON_SPEC_URL = "https://kuemura-cmd.github.io/kumamoto-job-analysis/annual_holidays_scatter_plot_deduplicated.json"; 
-        
-        async function initializeChart() {
-            try {
-                // JSONファイルをフェッチ
-                const response = await fetch(JSON_SPEC_URL);
-                if (!response.ok) {
-                    throw new Error('JSONファイルを読み込めませんでした: ' + response.statusText);
-                }
-                const originalSpec = await response.json();
-                
-                // グラフの描画
-                vegaEmbed('#vis', originalSpec, { mode: "vega-lite", actions: false }).catch(console.error);
+    <script>
+        // グラフ定義をJavaScriptオブジェクトとしてインライン化
+        const vegaLiteSpec = {
+          "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+          "title": "熊本市 各事業所の年間休日数散布図",
+          "data": {
+            "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5QjvstFqTzdOPORH62h7K_KCvwChYar9pJfWOfkWZ2HCoLrtLcZkzuahoosYpmafsEIBZM5az_7He/pub?gid=787523519&single=true&output=csv",
+            "format": {
+              "type": "csv",
+              "parse": {
+                "年間休日数": "number",
+                "区": "string",
+                "職種分類": "string",
+                "業種分類": "string",
+                "事業所名": "string"
+              }
+            }
+          },
+          "params": [
+            {
+              "name": "district_filter",
+              "bind": {
+                "input": "select",
+                "options": ["すべて", "中央区", "東区", "西区", "南区", "北区", "その他"],
+                "name": "エリア: "
+              },
+              "value": "すべて"
+            },
+            {
+              "name": "job_filter",
+              "bind": {
+                "input": "select",
+                "options": ["すべて", "准看護師", "正看護師", "その他看護職", "非看護職・未分類"],
+                "name": "職種: "
+              },
+              "value": "すべて"
+            }
+          ],
+          "transform": [
+            {"filter": "datum['年間休日数'] !== null && datum['年間休日数'] > 0"},
+            {"filter": "(datum['区'] === district_filter) || (district_filter === 'すべて')"},
+            {"filter": "(datum['職種分類'] === job_filter) || (job_filter === 'すべて')"},
+            {
+              "aggregate": [
+                {"op": "median", "field": "年間休日数", "as": "年間休日数（中央値）"}
+              ],
+              "groupby": ["事業所名", "区", "職種分類", "業種分類"]
+            },
+            {
+              "aggregate": [{"op": "median", "field": "年間休日数（中央値）", "as": "中央値_全体"}],
+              "as": ["中央値_全体"]
+            },
+            {
+              "window": [{"op": "rank", "as": "順位"}],
+              "sort": [{"field": "年間休日数（中央値）", "order": "ascending"}]
+            }
+          ],
+          "layer": [
+            {
+              "data": {"source": "data_0"},
+              "transform": [
+                {"aggregate": [{"op": "median", "field": "年間休日数（中央値）", "as": "中央値_全体"}]},
+                {"calculate": "'全体中央値'","as": "tooltip_label"}
+              ],
+              "mark": {"type": "rule", "color": "red", "strokeDash": [5, 5]},
+              "encoding": {
+                "y": {"field": "中央値_全体", "type": "quantitative"},
+                "tooltip": [
+                  {"field": "tooltip_label", "type": "nominal", "title": "中央値"},
+                  {"field": "中央値_全体", "format": ".1f", "title": "休日数"}
+                ]
+              }
+            },
+            {
+              "mark": {"type": "circle", "size": 60},
+              "encoding": {
+                "x": {"field": "順位", "title": "求人事業所 順位 (年間休日数中央値 昇順)"},
+                "y": {"field": "年間休日数（中央値）", "title": "年間休日数（中央値） (日)"},
+                "color": {"field": "職種分類", "type": "nominal", "title": "職種分類", "sort": ["正看護師", "准看護師", "その他看護職"]},
+                "tooltip": [
+                  "事業所名",
+                  "区",
+                  "職種分類",
+                  "業種分類",
+                  {"field": "年間休日数（中央値）", "format": ".0f", "title": "休日数中央値"}
+                ]
+              }
+            }
+          ],
+          "config": {
+            "title": {"fontSize": 16},
+            "legend": {"titleFontSize": 12, "labelFontSize": 11}
+          }
+        };
 
-            } catch (error) {
-                document.getElementById('vis').innerHTML = `<p style="color:red;">グラフの読み込みに失敗しました。JSONの構文またはデータヘッダーをご確認ください: ${error.message}</p>`;
-                console.error(error);
-            }
-        }
+        function initializeChart() {
+            try {
+                // JavaScriptオブジェクトとして定義したスペックを直接埋め込む
+                vegaEmbed('#vis', vegaLiteSpec, { mode: "vega-lite", actions: false }).catch(console.error);
 
-        window.onload = initializeChart;
-    </script>
+            } catch (error) {
+                document.getElementById('vis').innerHTML = `<p style="color:red;">グラフの読み込みに失敗しました。JSONの構文またはデータヘッダーをご確認ください: ${error.message}</p>`;
+                console.error(error);
+            }
+        }
+
+        window.onload = initializeChart;
+    </script>
 
 </body>
 </html>
