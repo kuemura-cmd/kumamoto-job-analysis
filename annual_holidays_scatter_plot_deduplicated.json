@@ -26,13 +26,9 @@
     }
   ],
   "transform": [
-    // 年間休日数の数値化
     {"calculate": "toNumber(datum['年間休日数'])", "as": "年間休日数_数値"},
-    
-    // フィルタリング (ブラケット記法で厳格化)
     {"filter": "(datum['区'] === district_filter) || (district_filter === 'すべて')"},
     {"filter": "(datum['職種分類'] === job_filter) || (job_filter === 'すべて')"},
-    
     {"filter": "datum.年間休日数_数値 !== null"},
     {
       "aggregate": [
