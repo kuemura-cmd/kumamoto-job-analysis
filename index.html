@@ -37,25 +37,29 @@
             "data": {
                 "url": "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5QjvstFqTzdOPORH62h7K_KCvwChYar9pJfWOfkWZ2HCoLrtLcZkzuahoosYpmafsEIBZM5az_7He/pub?gid=787523519&single=true&output=csv",
                 "format": {
-                    "type": "csv" 
+                    "type": "csv",
+                    "parse": {
+                        "年間休日数": "number",
+                        "区": "string",
+                        "職種分類": "string",
+                        "業種分類": "string",
+                        "事業所名": "string"
+                    }
                 }
             },
             "transform": [
-                // 1. 年間休日数を数値に変換し、新しいフィールドを作成
-                {"calculate": "isValid(toNumber(datum['年間休日数'])) ? toNumber(datum['年間休日数']) : null", "as": "年間休日数_数値"},
+                // 1. データクリーニング（NULLや無効データを除外）
+                {"filter": "datum['年間休日数'] !== null && datum['年間休日数'] > 0"},
                 
                 // 2. フィルタリング（JavaScriptで動的に挿入されます）
-                // 3. NULL値と無効なデータを排除 (年間休日数_数値を使用)
-                {"filter": "datum.年間休日数_数値 !== null && datum.年間休日数_数値 > 0"},
-                
-                // 4. 集計/重複排除
+                // 3. 集計/重複排除
                 {
                     "aggregate": [
-                        {"op": "median", "field": "年間休日数_数値", "as": "年間休日数（中央値）"}
+                        {"op": "median", "field": "年間休日数", "as": "年間休日数（中央値）"}
                     ],
                     "groupby": ["事業所名", "区", "職種分類", "業種分類"]
                 },
-                // 5. ランキングと中央値の再計算
+                // 4. ランキングと中央値の再計算
                 {
                     "window": [{"op": "rank", "as": "順位"}],
                     "sort": [{"field": "年間休日数（中央値）", "order": "ascending"}]
@@ -69,7 +73,7 @@
                 {
                     "mark": {"type": "rule", "color": "red", "strokeDash": [5, 5]},
                     "encoding": {
-                        "y": {"field": "中央値_全体", "type": "quantitative", "scale": {"domain": [90, 135]}}, 
+                        "y": {"field": "中央値_全体", "type": "quantitative", "scale": {"domain": [90, 135]}},
                         "tooltip": [
                             {"field": "中央値_全体", "format": ".1f", "title": "中央値"}
                         ]
@@ -127,8 +131,6 @@
         }
 
         function updateChart() {
-            if (!vegaLiteSpecTemplate) return;
-
             let spec = JSON.parse(JSON.stringify(vegaLiteSpecTemplate));
 
             const selectedDistrict = document.getElementById('district-select').value;
@@ -146,20 +148,19 @@
 
             // 1. フィルタリングロジックを挿入する
             // 全てのTransform要素を一時的に配列化
-            let allTransforms = [
-                spec.transform[0] // 年間休日数_数値の計算
-            ]; 
+            let allTransforms = [];
             
-            // フィルタ処理をベーストランスフォームの直後（2番目）に挿入
+            // フィルタ処理を先頭に挿入
             if (filters.length > 0) {
                 allTransforms.push({ filter: { and: filters } });
             }
 
-            // フィルタ後の集計・ランキング処理を再挿入
+            // 既存のTransformを挿入
             allTransforms.push(
-                spec.transform[2], // 集計/重複排除
-                spec.transform[3], // ランキング
-                spec.transform[4]  // 中央値
+                spec.transform[0], // データクリーニング
+                spec.transform[1], // 集計
+                spec.transform[2], // ランキング
+                spec.transform[3]  // 中央値
             );
             
             spec.transform = allTransforms; // 新しいTransform配列を適用
